@@ -9,4 +9,4 @@ Copy your extracted applet folder to:
 
     System-Wide (All Users): /usr/share/cinnamon/applets/
 
-(Note: In the file manager, press Ctrl + H in your Home folder to unhide .local.)
+(Note: In the file manager, press Ctrl + H in your Home folder to unhide .local)
