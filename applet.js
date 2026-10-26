@@ -53,6 +53,8 @@ class LaunchpadApplet extends Applet.TextIconApplet {
         this._cells = [];      // [{ btn, index }] for the visible page
         this._blurActor = null;
         this._blurCache = null;
+        this._sliding = false;
+        this._slideId = 0;
         this._lastScroll = 0;
         this._hotkeyId = 'launchpad-' + instanceId;
 
@@ -182,6 +184,8 @@ class LaunchpadApplet extends Applet.TextIconApplet {
         this._filtered = this._apps;
         this._page = 0;
         this._selected = -1;
+        this._sliding = false;
+        this._slideId++;
 
         const o = this._overlay = new St.BoxLayout({
             style_class: 'launchpad-overlay',
@@ -276,6 +280,8 @@ class LaunchpadApplet extends Applet.TextIconApplet {
         const o = this._overlay;
         if (!o) return;
         const blur = this._blurActor;
+        this._sliding = false;
+        this._slideId++;
         this._overlay = this._entry = this._grid = this._dots = this._blurActor = null;
 
         Main.popModal(o);
@@ -491,13 +497,60 @@ class LaunchpadApplet extends Applet.TextIconApplet {
         }
     }
 
+    // Slide the grid out in the direction of travel, swap in the new page,
+    // then slide it in from the opposite side. direction: +1 = next, -1 = previous.
+    _renderPageAnimated(direction) {
+        const grid = this._grid;
+        if (!grid || !this._overlay || direction === 0) {
+            this._renderPage();
+            return;
+        }
+
+        const id = ++this._slideId;
+
+        // Another page change while a slide is running: skip ahead to the final state
+        if (this._sliding) {
+            grid.remove_all_transitions();
+            grid.translation_x = 0;
+            grid.opacity = 255;
+            this._sliding = false;
+            this._renderPage();
+            return;
+        }
+
+        this._sliding = true;
+        const dist = Math.round(this._overlay.width * 0.10);
+
+        grid.ease({
+            translation_x: -direction * dist,
+            opacity: 0,
+            duration: 100,
+            mode: Clutter.AnimationMode.EASE_IN_QUAD,
+            onComplete: () => {
+                if (id !== this._slideId || this._grid !== grid) return;
+                this._renderPage();
+                grid.translation_x = direction * dist;
+                grid.ease({
+                    translation_x: 0,
+                    opacity: 255,
+                    duration: 170,
+                    mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+                    onComplete: () => {
+                        if (id === this._slideId) this._sliding = false;
+                    },
+                });
+            },
+        });
+    }
+
     _goToPage(page) {
         if (page < 0 || page >= this._pageCount()) return;
         const per = this.columns * this.rows;
+        const direction = Math.sign(page - this._page);
         this._page = page;
         // Keep a selection (if any) on the new page: jump to its first app
         if (this._selected >= 0) this._selected = page * per;
-        this._renderPage();
+        this._renderPageAnimated(direction);
     }
 
     _changePage(delta) {
@@ -510,10 +563,11 @@ class LaunchpadApplet extends Applet.TextIconApplet {
         index = Math.max(0, Math.min(n - 1, index));
         const per = this.columns * this.rows;
         const page = Math.floor(index / per);
+        const direction = Math.sign(page - this._page);
         this._selected = index;
         if (page !== this._page) {
             this._page = page;
-            this._renderPage();
+            this._renderPageAnimated(direction);
         } else {
             this._updateSelection();
         }
