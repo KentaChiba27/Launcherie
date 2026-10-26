@@ -1,0 +1,7 @@
+{
+    "uuid": "launchie@local",
+    "name": "Launchie",
+    "description": "A fullscreen, paged application launcher inspired by macOS Launchpad",
+    "version": "0.1",
+    "max-instances": 1
+}

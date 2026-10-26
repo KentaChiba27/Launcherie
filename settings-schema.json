@@ -1,0 +1,84 @@
+{
+    "panel-icon": {
+        "type": "iconfilechooser",
+        "default": "view-app-grid-symbolic",
+        "description": "Panel icon"
+    },
+    "panel-icon-size": {
+        "type": "spinbutton",
+        "default": 0,
+        "min": 0,
+        "max": 64,
+        "step": 1,
+        "units": "px",
+        "description": "Panel icon size (0 = automatic)"
+    },
+    "panel-label": {
+        "type": "entry",
+        "default": "",
+        "description": "Panel text (leave empty for none)"
+    },
+    "hotkey": {
+        "type": "keybinding",
+        "default": "<Super>a::",
+        "description": "Keyboard shortcut to toggle Launchpad"
+    },
+    "columns": {
+        "type": "spinbutton",
+        "default": 7,
+        "min": 3,
+        "max": 12,
+        "step": 1,
+        "description": "Columns"
+    },
+    "rows": {
+        "type": "spinbutton",
+        "default": 5,
+        "min": 2,
+        "max": 8,
+        "step": 1,
+        "description": "Rows"
+    },
+    "icon-size": {
+        "type": "spinbutton",
+        "default": 64,
+        "min": 32,
+        "max": 128,
+        "step": 8,
+        "units": "px",
+        "description": "Icon size"
+    },
+    "grid-align": {
+        "type": "combobox",
+        "default": "center",
+        "options": {
+            "Left": "start",
+            "Center": "center",
+            "Right": "end"
+        },
+        "description": "Icon alignment"
+    },
+    "enable-blur": {
+        "type": "switch",
+        "default": true,
+        "description": "Blur the wallpaper behind the launcher"
+    },
+    "blur-strength": {
+        "type": "spinbutton",
+        "default": 5,
+        "min": 1,
+        "max": 10,
+        "step": 1,
+        "description": "Blur strength (1-10)",
+        "dependency": "enable-blur"
+    },
+    "dim-amount": {
+        "type": "spinbutton",
+        "default": 55,
+        "min": 0,
+        "max": 100,
+        "step": 5,
+        "units": "%",
+        "description": "Background dimming"
+    }
+}

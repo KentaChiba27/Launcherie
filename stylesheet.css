@@ -1,0 +1,60 @@
+.launchpad-overlay {
+    background-color: rgba(12, 12, 18, 0.82);
+    padding: 48px 80px 32px 80px;
+}
+
+.launchpad-search {
+    width: 320px;
+    color: white;
+    background-color: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: 14px;
+    padding: 6px 14px;
+    caret-color: white;
+    selection-background-color: rgba(255, 255, 255, 0.3);
+    selected-color: white;
+}
+
+.launchpad-search:focus {
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+.launchpad-cell {
+    padding: 14px 8px;
+    border-radius: 16px;
+    border: 2px solid transparent;
+}
+
+.launchpad-cell:hover {
+    background-color: rgba(255, 255, 255, 0.10);
+}
+
+/* Keyboard / current selection indicator */
+.launchpad-cell-selected,
+.launchpad-cell-selected:hover {
+    background-color: rgba(255, 255, 255, 0.20);
+    border: 2px solid rgba(255, 255, 255, 0.75);
+}
+
+.launchpad-label {
+    color: white;
+    font-size: 11pt;
+    text-align: center;
+    padding-top: 8px;
+}
+
+.launchpad-dots {
+    spacing: 10px;
+    padding-top: 16px;
+}
+
+.launchpad-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 5px;
+    background-color: rgba(255, 255, 255, 0.35);
+}
+
+.launchpad-dot-active {
+    background-color: white;
+}
