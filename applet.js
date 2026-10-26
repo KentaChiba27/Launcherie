@@ -55,14 +55,20 @@ class LaunchpadApplet extends Applet.TextIconApplet {
         this._blurCache = null;
         this._sliding = false;
         this._slideId = 0;
+        this._cellCache = new Map();   // app id -> built cell (reused between pages)
+        this._prewarmId = 0;
         this._lastScroll = 0;
         this._hotkeyId = 'launchpad-' + instanceId;
 
         this.settings = new Settings.AppletSettings(this, metadata.uuid, instanceId);
         this.settings.bind('columns', 'columns', () => this._renderPage());
         this.settings.bind('rows', 'rows', () => this._renderPage());
-        this.settings.bind('icon-size', 'iconSize', () => this._renderPage());
+        this.settings.bind('icon-size', 'iconSize', () => {
+            this._clearCellCache();
+            this._renderPage();
+        });
         this.settings.bind('hotkey', 'hotkey', () => this._updateKeybinding());
+        this.settings.bind('slide-animation', 'slideAnimation');
         this.settings.bind('enable-blur', 'enableBlur');
         this.settings.bind('blur-strength', 'blurStrength');
         this.settings.bind('dim-amount', 'dimAmount');
@@ -228,6 +234,11 @@ class LaunchpadApplet extends Applet.TextIconApplet {
             y_align: Clutter.ActorAlign.START,
             style: 'padding-top: 24px;',
         });
+        // Without this, fading the grid renders it through an offscreen buffer
+        // every frame, which is a big part of what makes slides feel sluggish.
+        try {
+            this._grid.set_offscreen_redirect(Clutter.OffscreenRedirect.NEVER);
+        } catch (e) {}
         o.add_child(this._grid);
 
         // Page dots
@@ -280,6 +291,9 @@ class LaunchpadApplet extends Applet.TextIconApplet {
         const o = this._overlay;
         if (!o) return;
         const blur = this._blurActor;
+        const cache = this._cellCache;
+        this._cellCache = new Map();
+        this._prewarmId++;
         this._sliding = false;
         this._slideId++;
         this._overlay = this._entry = this._grid = this._dots = this._blurActor = null;
@@ -288,6 +302,9 @@ class LaunchpadApplet extends Applet.TextIconApplet {
         const cleanup = () => {
             Main.layoutManager.removeChrome(o);
             o.destroy();
+            for (const cell of cache.values()) {
+                try { cell.destroy(); } catch (e) {}
+            }
             if (blur) {
                 Main.layoutManager.removeChrome(blur);
                 blur.destroy();
@@ -399,7 +416,15 @@ class LaunchpadApplet extends Applet.TextIconApplet {
 
         const slice = this._filtered.slice(this._page * per, (this._page + 1) * per);
 
-                this._grid.destroy_all_children();
+        // Take cells back out of their rows (without destroying them) so they can
+        // be reused; only the cheap row containers and spacers are thrown away.
+        for (const row of this._grid.get_children()) {
+            for (const child of row.get_children()) {
+                if (child._isSpacer) child.destroy();
+                else row.remove_child(child);
+            }
+        }
+        this._grid.destroy_all_children();
         this._cells = [];
         if (this._selected >= this._filtered.length) this._selected = -1;
         for (let r = 0; r < rows; r++) {
@@ -410,7 +435,7 @@ class LaunchpadApplet extends Applet.TextIconApplet {
                 // Pad incomplete rows with invisible cells so every row has
                 // the same width and the columns always line up.
                 row.add_child(idx < slice.length
-                    ? this._makeCell(slice[idx], this._page * per + idx)
+                    ? this._getCell(slice[idx], this._page * per + idx)
                     : this._makeSpacer());
             }
             this._grid.add_child(row);
@@ -430,6 +455,7 @@ class LaunchpadApplet extends Applet.TextIconApplet {
         }
 
         this._updateSelection();
+        this._prewarm();
     }
 
     _updateSelection() {
@@ -441,11 +467,28 @@ class LaunchpadApplet extends Applet.TextIconApplet {
 
     _makeSpacer() {
         const spacer = new St.Bin({ style_class: 'launchpad-cell' });
+        spacer._isSpacer = true;
         spacer.set_style('width: %dpx;'.format(Math.round(this.iconSize * 1.7)));
         return spacer;
     }
 
-    _makeCell(appInfo, index) {
+    _cellKey(appInfo) {
+        return appInfo.get_id() || appInfo.get_name();
+    }
+
+    _getCell(appInfo, index) {
+        const key = this._cellKey(appInfo);
+        let btn = this._cellCache.get(key);
+        if (!btn) {
+            btn = this._buildCell(appInfo);
+            this._cellCache.set(key, btn);
+        }
+        btn._index = index;   // position changes with search/paging, so keep it on the cell
+        this._cells.push({ btn, index });
+        return btn;
+    }
+
+    _buildCell(appInfo) {
         const size = this.iconSize;
         const btn = new St.Button({
             style_class: 'launchpad-cell',
@@ -474,14 +517,46 @@ class LaunchpadApplet extends Applet.TextIconApplet {
         // Moving the mouse onto a cell moves the keyboard selection there too,
         // so there's only ever one highlighted app.
         btn.connect('motion-event', () => {
-            if (this._selected !== index) {
-                this._selected = index;
+            if (this._selected !== btn._index) {
+                this._selected = btn._index;
                 this._updateSelection();
             }
             return Clutter.EVENT_PROPAGATE;
         });
-        this._cells.push({ btn, index });
         return btn;
+    }
+
+    // Build the cells for the neighbouring pages in the background, a few at a
+    // time, so flipping to them doesn't have to create icons mid-animation.
+    _prewarm() {
+        if (!this._overlay) return;
+        const id = ++this._prewarmId;
+        const per = this.columns * this.rows;
+        const queue = [];
+        for (const page of [this._page + 1, this._page - 1]) {
+            if (page < 0) continue;
+            for (const app of this._filtered.slice(page * per, (page + 1) * per))
+                if (!this._cellCache.has(this._cellKey(app))) queue.push(app);
+        }
+        if (queue.length === 0) return;
+
+        GLib.idle_add(GLib.PRIORITY_LOW, () => {
+            if (id !== this._prewarmId || !this._overlay) return GLib.SOURCE_REMOVE;
+            for (let i = 0; i < 4 && queue.length; i++) {
+                const app = queue.shift();
+                const key = this._cellKey(app);
+                if (!this._cellCache.has(key))
+                    this._cellCache.set(key, this._buildCell(app));
+            }
+            return queue.length ? GLib.SOURCE_CONTINUE : GLib.SOURCE_REMOVE;
+        });
+    }
+
+    _clearCellCache() {
+        for (const cell of this._cellCache.values()) {
+            try { cell.destroy(); } catch (e) {}
+        }
+        this._cellCache.clear();
     }
 
     // ---------- actions ----------
@@ -501,7 +576,7 @@ class LaunchpadApplet extends Applet.TextIconApplet {
     // then slide it in from the opposite side. direction: +1 = next, -1 = previous.
     _renderPageAnimated(direction) {
         const grid = this._grid;
-        if (!grid || !this._overlay || direction === 0) {
+        if (!this.slideAnimation || !grid || !this._overlay || direction === 0) {
             this._renderPage();
             return;
         }
@@ -519,12 +594,12 @@ class LaunchpadApplet extends Applet.TextIconApplet {
         }
 
         this._sliding = true;
-        const dist = Math.round(this._overlay.width * 0.10);
+        const dist = Math.round(this._overlay.width * 0.08);
 
         grid.ease({
             translation_x: -direction * dist,
             opacity: 0,
-            duration: 100,
+            duration: 70,
             mode: Clutter.AnimationMode.EASE_IN_QUAD,
             onComplete: () => {
                 if (id !== this._slideId || this._grid !== grid) return;
@@ -533,7 +608,7 @@ class LaunchpadApplet extends Applet.TextIconApplet {
                 grid.ease({
                     translation_x: 0,
                     opacity: 255,
-                    duration: 170,
+                    duration: 130,
                     mode: Clutter.AnimationMode.EASE_OUT_QUAD,
                     onComplete: () => {
                         if (id === this._slideId) this._sliding = false;

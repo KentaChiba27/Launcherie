@@ -48,6 +48,11 @@
         "units": "px",
         "description": "Icon size"
     },
+    "slide-animation": {
+        "type": "switch",
+        "default": true,
+        "description": "Slide animation when changing pages"
+    },
     "enable-blur": {
         "type": "switch",
         "default": true,
