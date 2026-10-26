@@ -2,7 +2,7 @@
 
 <b>Launchie</b> is a lightweight, fullscreen, paged application launcher for Linux Mint inspired by the clean, grid-based aesthetic of macOS Launchpad. Designed to integrate seamlessly with the Cinnamon desktop environment, it offers a distraction-free, visually appealing interface for browsing and launching your installed applications.
 
-<b>- - - - HOW TO INSTALL - - - -</b>
+<b>HOW TO INSTALL - </b>
 Copy your extracted applet folder to:
 
     Current User (Recommended): ~/.local/share/cinnamon/applets/
