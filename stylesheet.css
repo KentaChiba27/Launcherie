@@ -58,3 +58,51 @@
 .launchpad-dot-active {
     background-color: white;
 }
+
+/* Folders and drag & drop */
+.launchpad-folder-icon {
+    background-color: rgba(255, 255, 255, 0.18);
+    border-radius: 18px;
+    padding: 8px;
+}
+
+.launchpad-cell-dragging {
+    background-color: rgba(255, 255, 255, 0.04);
+}
+
+.launchpad-drop-merge {
+    background-color: rgba(255, 255, 255, 0.28);
+    border: 2px solid rgba(255, 255, 255, 0.9);
+}
+
+.launchpad-drop-before {
+    border-left: 2px solid white;
+}
+
+.launchpad-drop-after {
+    border-right: 2px solid white;
+}
+
+.launchpad-folder-holder {
+    background-color: rgba(0, 0, 0, 0.35);
+}
+
+.launchpad-folder {
+    background-color: rgba(30, 30, 40, 0.94);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 28px;
+    padding: 24px 28px 28px 28px;
+}
+
+.launchpad-folder-name {
+    width: 260px;
+    color: white;
+    font-size: 14pt;
+    background-color: rgba(255, 255, 255, 0.10);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 12px;
+    padding: 6px 14px;
+    caret-color: white;
+    selection-background-color: rgba(255, 255, 255, 0.3);
+    selected-color: white;
+}
