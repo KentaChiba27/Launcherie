@@ -60,7 +60,6 @@ class LaunchpadApplet extends Applet.TextIconApplet {
         this.settings.bind('columns', 'columns', () => this._renderPage());
         this.settings.bind('rows', 'rows', () => this._renderPage());
         this.settings.bind('icon-size', 'iconSize', () => this._renderPage());
-        this.settings.bind('grid-align', 'gridAlign', () => this._renderPage());
         this.settings.bind('hotkey', 'hotkey', () => this._updateKeybinding());
         this.settings.bind('enable-blur', 'enableBlur');
         this.settings.bind('blur-strength', 'blurStrength');
@@ -221,7 +220,7 @@ class LaunchpadApplet extends Applet.TextIconApplet {
         this._grid = new St.BoxLayout({
             vertical: true,
             x_expand: true, y_expand: true,
-            x_align: this._alignValue(),
+            x_align: Clutter.ActorAlign.CENTER,
             y_align: Clutter.ActorAlign.START,
             style: 'padding-top: 24px;',
         });
@@ -379,14 +378,6 @@ class LaunchpadApplet extends Applet.TextIconApplet {
 
     // ---------- rendering ----------
 
-    _alignValue() {
-        switch (this.gridAlign) {
-            case 'center': return Clutter.ActorAlign.CENTER;
-            case 'end': return Clutter.ActorAlign.END;
-            default: return Clutter.ActorAlign.START;
-        }
-    }
-
     _pageCount() {
         const per = this.columns * this.rows;
         return Math.max(1, Math.ceil(this._filtered.length / per));
@@ -402,14 +393,12 @@ class LaunchpadApplet extends Applet.TextIconApplet {
 
         const slice = this._filtered.slice(this._page * per, (this._page + 1) * per);
 
-        const align = this._alignValue();
-        this._grid.x_align = align;
-        this._grid.destroy_all_children();
+                this._grid.destroy_all_children();
         this._cells = [];
         if (this._selected >= this._filtered.length) this._selected = -1;
         for (let r = 0; r < rows; r++) {
             if (r * cols >= slice.length) break;
-            const row = new St.BoxLayout({ x_align: align });
+            const row = new St.BoxLayout({ x_align: Clutter.ActorAlign.CENTER });
             for (let c = 0; c < cols; c++) {
                 const idx = r * cols + c;
                 // Pad incomplete rows with invisible cells so every row has

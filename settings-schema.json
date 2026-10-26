@@ -48,16 +48,6 @@
         "units": "px",
         "description": "Icon size"
     },
-    "grid-align": {
-        "type": "combobox",
-        "default": "center",
-        "options": {
-            "Left": "start",
-            "Center": "center",
-            "Right": "end"
-        },
-        "description": "Icon alignment"
-    },
     "enable-blur": {
         "type": "switch",
         "default": true,
