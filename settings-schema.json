@@ -21,7 +21,7 @@
     "hotkey": {
         "type": "keybinding",
         "default": "<Super>a::",
-        "description": "Keyboard shortcut to toggle Launchpad"
+        "description": "Keyboard shortcut to toggle Launcherie"
     },
     "columns": {
         "type": "spinbutton",

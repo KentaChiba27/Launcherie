@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 KentaChiba27
+
 const Applet = imports.ui.applet;
 const Main = imports.ui.main;
 const Settings = imports.ui.settings;
@@ -9,6 +12,15 @@ const Pango = imports.gi.Pango;
 const Cinnamon = imports.gi.Cinnamon;
 const DND = imports.ui.dnd;
 const ByteArray = imports.byteArray;
+const Gettext = imports.gettext;
+
+const UUID = 'launcherie@KentaChiba27';
+Gettext.bindtextdomain(UUID, GLib.get_home_dir() + '/.local/share/locale');
+
+function _(str) {
+    const translated = Gettext.dgettext(UUID, str);
+    return translated !== str ? translated : Gettext.gettext(str);
+}
 
 // Separable box blur, run a couple of times it closely approximates a gaussian.
 function blurPass(src, dst, w, h, stride, nch, r, horizontal) {
@@ -42,7 +54,7 @@ class LaunchpadApplet extends Applet.TextIconApplet {
     constructor(metadata, orientation, panelHeight, instanceId) {
         super(orientation, panelHeight, instanceId);
 
-        this.set_applet_tooltip('Launchie');
+        this.set_applet_tooltip(_('Launcherie'));
 
         this._overlay = null;
         this._entry = null;
@@ -75,6 +87,7 @@ class LaunchpadApplet extends Applet.TextIconApplet {
         this._hoverCell = null;
         this._edgeTimer = 0;
         this._edgeDir = 0;
+        this._sources = new Set();     // pending idle sources, cancelled on removal
         this._loadLayout();
         this._hotkeyId = 'launchpad-' + instanceId;
 
@@ -103,8 +116,24 @@ class LaunchpadApplet extends Applet.TextIconApplet {
         this._toggle();
     }
 
+    // Idle callbacks are tracked so none can fire after the applet is removed
+    _addIdle(priority, fn) {
+        const id = GLib.idle_add(priority, () => {
+            const result = fn();
+            if (result !== GLib.SOURCE_CONTINUE) this._sources.delete(id);
+            return result;
+        });
+        this._sources.add(id);
+        return id;
+    }
+
     on_applet_removed_from_panel() {
         this._close(true);
+        this._cancelEdgeTimer();
+        for (const id of this._sources) GLib.source_remove(id);
+        this._sources.clear();
+        this._clearCellCache();
+        this._blurCache = null;
         try { Main.keybindingManager.removeHotKey(this._hotkeyId); } catch (e) {}
         this.settings.finalize();
     }
@@ -119,7 +148,7 @@ class LaunchpadApplet extends Applet.TextIconApplet {
             this.set_applet_icon_name(icon);
         this.set_applet_label(this.panelLabel || '');
         this._applyPanelIconSize();
-        GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+        this._addIdle(GLib.PRIORITY_DEFAULT_IDLE, () => {
             try { this._applyPanelIconSize(); } catch (e) {}
             return GLib.SOURCE_REMOVE;
         });
@@ -135,7 +164,6 @@ class LaunchpadApplet extends Applet.TextIconApplet {
             // the property and an inline style (inline style wins over the theme).
             icon.set_icon_size(size);
             icon.set_style('icon-size: %dpx;'.format(size));
-            global.log('Launchie: panel icon size set to ' + size);
         } else {
             // 0 = automatic: drop our override and let Cinnamon size it
             icon.set_style('');
@@ -180,16 +208,20 @@ class LaunchpadApplet extends Applet.TextIconApplet {
             .sort((a, b) => a.get_name().localeCompare(b.get_name()));
     }
 
-    // ---------- layout (folders + order), saved in ~/.config/launchie/layout.json ----------
+    // ---------- layout (folders + order), saved in ~/.config/launcherie/layout.json ----------
 
-    _layoutPath() {
-        return GLib.build_filenamev([GLib.get_user_config_dir(), 'launchie', 'layout.json']);
+    _layoutPath(dir = 'launcherie') {
+        return GLib.build_filenamev([GLib.get_user_config_dir(), dir, 'layout.json']);
     }
 
     _loadLayout() {
         this._layout = { order: [], folders: {} };
         try {
-            const [ok, bytes] = Gio.File.new_for_path(this._layoutPath()).load_contents(null);
+            // Fall back to the layout saved under the old "launchie" name, if any
+            let file = Gio.File.new_for_path(this._layoutPath());
+            if (!file.query_exists(null))
+                file = Gio.File.new_for_path(this._layoutPath('launchie'));
+            const [ok, bytes] = file.load_contents(null);
             if (!ok) return;
             const d = JSON.parse(ByteArray.toString(bytes));
             if (d && Array.isArray(d.order))
@@ -198,7 +230,7 @@ class LaunchpadApplet extends Applet.TextIconApplet {
                 for (const [id, f] of Object.entries(d.folders)) {
                     if (f && Array.isArray(f.apps))
                         this._layout.folders[id] = {
-                            name: String(f.name || 'Folder'),
+                            name: String(f.name || _('Folder')),
                             apps: f.apps.filter(a => typeof a === 'string'),
                         };
                 }
@@ -214,7 +246,7 @@ class LaunchpadApplet extends Applet.TextIconApplet {
             GLib.mkdir_with_parents(GLib.path_get_dirname(path), 0o755);
             GLib.file_set_contents(path, JSON.stringify(this._layout));
         } catch (e) {
-            global.logError('Launchie: could not save layout: ' + e);
+            global.logError('Launcherie: could not save layout: ' + e);
         }
     }
 
@@ -303,7 +335,7 @@ class LaunchpadApplet extends Applet.TextIconApplet {
             const id = 'f' + Date.now().toString(36);
             this._removeFromLayout(srcKey);
             const at = L.order.indexOf(targetKey);
-            L.folders[id] = { name: 'Folder', apps: [targetKey, srcKey] };
+            L.folders[id] = { name: _('Folder'), apps: [targetKey, srcKey] };
             if (at >= 0) L.order.splice(at, 1, 'folder:' + id);
             else L.order.push('folder:' + id);
         }
@@ -323,7 +355,7 @@ class LaunchpadApplet extends Applet.TextIconApplet {
         for (const [key, cell] of [...this._cellCache.entries()]) {
             if (!key.startsWith('folder:')) continue;
             this._cellCache.delete(key);
-            GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+            this._addIdle(GLib.PRIORITY_DEFAULT_IDLE, () => {
                 try { cell.destroy(); } catch (e) {}
                 return GLib.SOURCE_REMOVE;
             });
@@ -378,7 +410,7 @@ class LaunchpadApplet extends Applet.TextIconApplet {
         this._entry = new St.Entry({
             style_class: 'launchpad-search',
             // Leading em space keeps the placeholder clear of the blinking text cursor
-            hint_text: '\u2003Search',
+            hint_text: '\u2003' + _('Search'),
             can_focus: true,
             x_align: Clutter.ActorAlign.CENTER,
         });
@@ -545,7 +577,7 @@ class LaunchpadApplet extends Applet.TextIconApplet {
                                               Clutter.ScalingFilter.LINEAR);
             return actor;
         } catch (e) {
-            global.logError('Launchie: could not create blur: ' + e);
+            global.logError('Launcherie: could not create blur: ' + e);
             return null;
         }
     }
@@ -777,7 +809,7 @@ class LaunchpadApplet extends Applet.TextIconApplet {
         }
         if (queue.length === 0) return;
 
-        GLib.idle_add(GLib.PRIORITY_LOW, () => {
+        this._addIdle(GLib.PRIORITY_LOW, () => {
             if (id !== this._prewarmId || !this._overlay) return GLib.SOURCE_REMOVE;
             for (let i = 0; i < 4 && queue.length; i++) {
                 const item = queue.shift();
@@ -837,7 +869,7 @@ class LaunchpadApplet extends Applet.TextIconApplet {
 
         if (this._folderHolder) {
             if (accepted) {
-                GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+                this._addIdle(GLib.PRIORITY_DEFAULT_IDLE, () => {
                     this._closeFolder(true);
                     return GLib.SOURCE_REMOVE;
                 });
@@ -1024,7 +1056,7 @@ class LaunchpadApplet extends Applet.TextIconApplet {
 
         let newName = null;
         if (!skipRename && entry) {
-            const name = entry.get_text().trim() || 'Folder';
+            const name = entry.get_text().trim() || _('Folder');
             const f = this._layout.folders[id];
             if (f && f.name !== name) newName = name;
         }
@@ -1057,7 +1089,7 @@ class LaunchpadApplet extends Applet.TextIconApplet {
             if (app) app.open_new_window(-1);
             else appInfo.launch([], global.create_app_launch_context(0, -1));
         } catch (e) {
-            global.logError('Launchie: failed to launch ' + appInfo.get_id() + ': ' + e);
+            global.logError('Launcherie: failed to launch ' + appInfo.get_id() + ': ' + e);
         }
     }
 

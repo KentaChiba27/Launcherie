@@ -1,6 +1,6 @@
 {
-    "uuid": "launchie@local",
-    "name": "Launchie",
+    "uuid": "launcherie@KentaChiba27",
+    "name": "Launcherie",
     "description": "A fullscreen, paged application launcher inspired by macOS Launchpad",
     "version": "0.1",
     "max-instances": 1
