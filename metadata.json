@@ -2,6 +2,6 @@
     "uuid": "launcherie@KentaChiba27",
     "name": "Launcherie",
     "description": "A fullscreen, paged application launcher inspired by macOS Launchpad",
-    "version": "0.1",
+    "version": "1.0",
     "max-instances": 1
 }
